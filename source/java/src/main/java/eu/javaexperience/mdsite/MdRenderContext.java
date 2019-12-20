@@ -5,9 +5,13 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.commonmark.Extension;
 import org.commonmark.ext.gfm.strikethrough.StrikethroughExtension;
@@ -15,12 +19,22 @@ import org.commonmark.ext.gfm.tables.TablesExtension;
 import org.commonmark.parser.Parser;
 import org.commonmark.renderer.html.HtmlRenderer;
 
+import eu.javaexperience.collection.map.MapTools;
+import eu.javaexperience.collection.map.SmallMap;
 import eu.javaexperience.interfaces.simple.getBy.GetBy1;
 import eu.javaexperience.io.IOTools;
+import eu.javaexperience.log.JavaExperienceLoggingFacility;
+import eu.javaexperience.log.LogLevel;
+import eu.javaexperience.log.Loggable;
+import eu.javaexperience.log.Logger;
+import eu.javaexperience.log.LoggingTools;
+import eu.javaexperience.reflect.CastTo;
 import eu.javaexperience.text.StringTools;
 
 public class MdRenderContext implements Cloneable
 {
+	protected static final Logger LOG = JavaExperienceLoggingFacility.getLogger(new Loggable("MdRenderContext"));
+	
 	public String rootDir;
 	public Properties props;
 	public GetBy1<String, String> render; 
@@ -126,7 +140,7 @@ public class MdRenderContext implements Cloneable
 	public static MdRenderContext createContext(String root, String cfgFile, Properties prop) throws IOException
 	{
 		MdRenderContext ctx = new MdRenderContext();
-		ctx.render = MdRenderContext.createDefaultRenderer();
+		ctx.render = ctx.createRenderer();
 		ctx.cfgFile = cfgFile;
 		ctx.props = prop;
 		ctx.rootDir = root;
@@ -153,6 +167,69 @@ public class MdRenderContext implements Cloneable
 		return ctx;
 	}
 	
+	public boolean isRewriteInternalLinkHrefs()
+	{
+		return Boolean.TRUE == CastTo.Boolean.cast(props.get("rewrite_internal_link_href"));
+	}
+	
+	protected static final Pattern FIND_HREFS = Pattern.compile("href\\s*=\\s*\\\"(?<url>[^\"]+)\\\"");
+	protected static final Pattern FIND_EXTERNSION = Pattern.compile("(?<file>.*)(?<ext>\\.md)(?<post>($|#|\\?).*)", Pattern.CASE_INSENSITIVE);
+	
+	public static boolean isFullUrl(String str)
+	{
+		try
+		{
+			new URL(str);
+			return true;
+		}
+		catch(Exception e)
+		{
+			return false;
+		}
+	}
+	
+	public GetBy1<String, String> createRenderer()
+	{
+		GetBy1<String, String> def = MdRenderContext.createDefaultRenderer();
+		return s->
+		{
+			s = def.getBy(s);
+			if(isRewriteInternalLinkHrefs())
+			{
+				String te = getTargetFileExtension();
+				if(!"md".equals(te))
+				{
+					Map<String, String> ft = new SmallMap<>();
+					
+					Matcher m = FIND_HREFS.matcher(s);
+					while(m.find())
+					{
+						String url = m.group("url");
+						if(!isFullUrl(url))
+						{
+							if(LOG.mayLog(LogLevel.DEBUG))
+							{
+								LoggingTools.tryLogFormat(LOG, LogLevel.DEBUG, "Link found: `%s`", url);
+							}
+							Matcher em = FIND_EXTERNSION.matcher(url);
+							if(em.find())
+							{
+								ft.put(em.group(0), em.group("file")+"."+te+em.group("post"));
+							}
+						}
+					}
+					
+					if(LOG.mayLog(LogLevel.DEBUG))
+					{
+						LoggingTools.tryLogFormat(LOG, LogLevel.DEBUG, "Rewriting urls: %s", MapTools.toStringMultiline(ft));
+					}
+					s = StringTools.multiReplaceAllString(s, ft);
+				}
+			}
+			return s;
+		};
+	}
+
 	public static Properties loadProperties(String propFile) throws IOException
 	{
 		try

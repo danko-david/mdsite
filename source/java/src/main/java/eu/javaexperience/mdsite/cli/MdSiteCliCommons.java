@@ -27,4 +27,11 @@ public class MdSiteCliCommons
 		"The config file in the sourcer directory (default: main.mds)",
 		"c", "-config-file"
 	);
+	
+	public static final CliEntry<Boolean> CLI_FORCE = CliEntry.createFirstArgParserEntry
+	(
+		e->true,
+		"Force to (re)compile markdowns",
+		"f", "-force"
+	);
 }

@@ -116,6 +116,7 @@ public class MdsiteCompileCli
 						);
 					}
 					
+					srcMod = Math.max(srcMod, ctx.lastModify);
 					if(!t.exists() || srcMod > t.lastModified() || forceCompile)
 					{
 						IOTools.putFileContent(dst, ctx.renderContent(IOTools.getFileContents(f)).getBytes());

@@ -40,7 +40,7 @@ If you want to force all page to recompile specify the `-f` cli option.
 ### [UARTBus](https://www.uartbus.eu/)
 
 The whole site is compile from this repository: [https://github.com/danko-david/uartbus](https://github.com/danko-david/uartbus)  
-The `main.mds` is located in [./doc/main.mds](https://github.com/danko-david/uartbus/blob/master/doc/main.mds)  
+The `main.mds` is located in [./doc/mdsite/main.mds](https://github.com/danko-david/uartbus/blob/master/doc/mdsite/main.mds)  
 
 Incremental compilation is made by a script in [./scripts/mdsite_compile.sh](https://github.com/danko-david/uartbus/blob/master/scripts/mdsite_compile.sh)
 

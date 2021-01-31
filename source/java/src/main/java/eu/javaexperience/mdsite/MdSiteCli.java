@@ -24,7 +24,7 @@ public class MdSiteCli
 	}
 	
 	/**
-	 * Creates the necessary files to a compilation to the current directory.
+	 * Creates the necessary files for a compilation into the current directory.
 	 * */
 	public static void seed(String... args) throws Throwable
 	{

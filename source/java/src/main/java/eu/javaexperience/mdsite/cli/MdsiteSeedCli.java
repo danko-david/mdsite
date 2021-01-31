@@ -17,7 +17,7 @@ public class MdsiteSeedCli
 		
 		IOTools.writeStringToFile
 		(
-			"md_root_dir=.\nwrapper=wrapper.html?body_content\ntarget_file_extension=md\rewrite_internal_link_href=true",
+			"md_root_dir=.\nwrapper=wrapper.html?body_content\ntarget_file_extension=html\nrewrite_internal_link_href=true",
 			"./main.mds"
 		);
 

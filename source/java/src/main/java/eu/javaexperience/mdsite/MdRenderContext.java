@@ -3,10 +3,12 @@ package eu.javaexperience.mdsite;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -29,6 +31,7 @@ import eu.javaexperience.log.Loggable;
 import eu.javaexperience.log.Logger;
 import eu.javaexperience.log.LoggingTools;
 import eu.javaexperience.reflect.CastTo;
+import eu.javaexperience.text.Format;
 import eu.javaexperience.text.StringTools;
 
 public class MdRenderContext implements Cloneable
@@ -53,6 +56,59 @@ public class MdRenderContext implements Cloneable
 		cfgFile = ctx.cfgFile;
 	}
 	
+	public void init() throws FileNotFoundException, IOException
+	{
+		String wrapperFile = StringTools.toStringOrNull(props.get("wrapper"));
+		
+		if(null != wrapperFile)
+		{
+			String file = getSourceDir()+"/"+StringTools.getSubstringBeforeFirstString(wrapperFile, "?", wrapperFile);
+			String _replace = StringTools.getSubstringAfterFirstString(wrapperFile, "?", null);
+			
+			if(null == _replace)
+			{
+				throw new RuntimeException("No replacement variable specified at the wrapper in the `"+cfgFile+"`. Use this form: wrapper=index.html?body_content");
+			}
+			
+			String replace = "$"+_replace;
+			
+			File wf = new File(file);
+			if(!wf.exists())
+			{
+				LoggingTools.tryLogFormat
+				(
+					LOG,
+					LogLevel.WARNING,
+					"Specified wrapper file `%s` doesn't exists",
+					file
+				);
+			}
+			else
+			{
+				lastModify = wf.lastModified();
+				LoggingTools.tryLogFormat
+				(
+					LOG,
+					LogLevel.DEBUG,
+					"Wrapper file last modification date: %s", Format.SQL_TIMESTAMP.format(new Date(lastModify))
+				);
+				
+				String wrapper = IOTools.getFileContents(file);
+				processors.add(src->StringTools.replaceAllStrings(wrapper, replace, src));
+			}
+		}
+		else
+		{
+			LoggingTools.tryLogFormat
+			(
+				LOG,
+				LogLevel.INFO,
+				"No wrapper file specified",
+				wrapperFile
+			);
+		}
+	}
+	
 	public MdRenderContext(){}
 
 	public MdRenderContext clone()
@@ -65,7 +121,6 @@ public class MdRenderContext implements Cloneable
 		List<Extension> extensions = new ArrayList<>();
 		extensions.add(TablesExtension.create());
 		extensions.add(StrikethroughExtension.create());
-		//TODO implement, create, add extra processor for {} and {{}}
 		
 		Parser parser = Parser.builder()
 			.extensions(extensions)
@@ -88,15 +143,15 @@ public class MdRenderContext implements Cloneable
 		return ret;
 	}
 
-	public File getSourceDir()
+	public File getSourceDir() throws IOException
 	{
 		String add = StringTools.toStringOrNull(props.get("md_root_dir"));
 		if(null == add)
 		{
-			return new File(rootDir);
+			return new File(rootDir).getCanonicalFile();
 		}
 		
-		return new File(rootDir+add);
+		return new File(rootDir+add).getCanonicalFile();
 	}
 	
 	private static final ThreadLocal<MdRenderContext> THREAD_CONTEXT = new ThreadLocal<>();
@@ -145,24 +200,7 @@ public class MdRenderContext implements Cloneable
 		ctx.props = prop;
 		ctx.rootDir = root;
 		
-		String wrapperFile = StringTools.toStringOrNull(prop.get("wrapper"));
-		if(null != wrapperFile)
-		{
-			String file = StringTools.getSubstringBeforeFirstString(wrapperFile, "?", null);
-			String _replace = StringTools.getSubstringAfterFirstString(wrapperFile, "?", null);
-			
-			if(null == _replace)
-			{
-				throw new RuntimeException("No replacement variable specified at the wrapper in the `"+ctx.cfgFile+"`. Use this form: wrapper=index.html?body_content");
-			}
-			
-			String replace = "$"+_replace;
-			
-			ctx.lastModify = Math.max(ctx.lastModify, new File(file).lastModified());
-			
-			String wrapper = IOTools.getFileContents(ctx.getSourceDir()+"/"+file);
-			ctx.processors.add(src->StringTools.replaceAllStrings(wrapper, replace, src));
-		}
+		ctx.init();
 		
 		return ctx;
 	}

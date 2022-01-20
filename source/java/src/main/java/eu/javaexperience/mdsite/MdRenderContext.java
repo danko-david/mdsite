@@ -107,6 +107,52 @@ public class MdRenderContext implements Cloneable
 				wrapperFile
 			);
 		}
+		
+		//TODO source file extension
+		
+		String te = getTargetFileExtension();
+		if(!"md".equals(te))
+		{
+			processors.add
+			(
+				s->
+				{
+					if(isRewriteInternalLinkHrefs())
+					{
+						Map<String, String> ft = new SmallMap<>();
+						
+						Matcher m = FIND_HREFS.matcher(s);
+						while(m.find())
+						{
+							String url = m.group("url");
+							if(!isFullUrl(url))
+							{
+								if(LOG.mayLog(LogLevel.DEBUG))
+								{
+									LoggingTools.tryLogFormat(LOG, LogLevel.DEBUG, "Link found: `%s`", url);
+								}
+								Matcher em = FIND_EXTENSION.matcher(url);
+								if(em.find())
+								{
+									ft.put(em.group(0), em.group("file")+"."+te+em.group("post"));
+								}
+								else if(LOG.mayLog(LogLevel.TRACE))
+								{
+									LoggingTools.tryLogFormat(LOG, LogLevel.TRACE, "Can't rewrite URL: `%s`", url);
+								}
+							}
+						}
+						
+						if(LOG.mayLog(LogLevel.DEBUG))
+						{
+							LoggingTools.tryLogFormat(LOG, LogLevel.DEBUG, "Rewriting urls: %s", MapTools.toStringMultiline(ft));
+						}
+						s = StringTools.multiReplaceAllString(s, ft);
+					}
+					return s;
+				}
+			);
+		}
 	}
 	
 	public MdRenderContext(){}
@@ -135,6 +181,12 @@ public class MdRenderContext implements Cloneable
 
 	public String renderContent(String content)
 	{
+		//if it contains shebang remove it.
+		if(content.startsWith("#!/"))
+		{
+			content = StringTools.getSubstringAfterFirstString(content, "\n");
+		}
+		
 		String ret = render.getBy(content);
 		for(GetBy1<String, String> p:processors)
 		{
@@ -207,11 +259,16 @@ public class MdRenderContext implements Cloneable
 	
 	public boolean isRewriteInternalLinkHrefs()
 	{
+		if(null != System.getenv("MDSITE_REWRITE_HREF"))
+		{
+			return Boolean.TRUE == CastTo.Boolean.cast(System.getenv("MDSITE_REWRITE_HREF"));
+		}
+		
 		return Boolean.TRUE == CastTo.Boolean.cast(props.get("rewrite_internal_link_href"));
 	}
 	
-	protected static final Pattern FIND_HREFS = Pattern.compile("href\\s*=\\s*\\\"(?<url>[^\"]+)\\\"");
-	protected static final Pattern FIND_EXTERNSION = Pattern.compile("(?<file>.*)(?<ext>\\.md)(?<post>($|#|\\?).*)", Pattern.CASE_INSENSITIVE);
+	protected static final Pattern FIND_HREFS = Pattern.compile("href\\s*=\\s*\"(?<url>[^\"]+)\"");
+	protected static final Pattern FIND_EXTENSION = Pattern.compile("(?<file>.*)(?<ext>\\.md)(?<post>($|#|\\?).*)?", Pattern.CASE_INSENSITIVE);
 	
 	public static boolean isFullUrl(String str)
 	{
@@ -228,44 +285,7 @@ public class MdRenderContext implements Cloneable
 	
 	public GetBy1<String, String> createRenderer()
 	{
-		GetBy1<String, String> def = MdRenderContext.createDefaultRenderer();
-		return s->
-		{
-			s = def.getBy(s);
-			if(isRewriteInternalLinkHrefs())
-			{
-				String te = getTargetFileExtension();
-				if(!"md".equals(te))
-				{
-					Map<String, String> ft = new SmallMap<>();
-					
-					Matcher m = FIND_HREFS.matcher(s);
-					while(m.find())
-					{
-						String url = m.group("url");
-						if(!isFullUrl(url))
-						{
-							if(LOG.mayLog(LogLevel.DEBUG))
-							{
-								LoggingTools.tryLogFormat(LOG, LogLevel.DEBUG, "Link found: `%s`", url);
-							}
-							Matcher em = FIND_EXTERNSION.matcher(url);
-							if(em.find())
-							{
-								ft.put(em.group(0), em.group("file")+"."+te+em.group("post"));
-							}
-						}
-					}
-					
-					if(LOG.mayLog(LogLevel.DEBUG))
-					{
-						LoggingTools.tryLogFormat(LOG, LogLevel.DEBUG, "Rewriting urls: %s", MapTools.toStringMultiline(ft));
-					}
-					s = StringTools.multiReplaceAllString(s, ft);
-				}
-			}
-			return s;
-		};
+		return MdRenderContext.createDefaultRenderer();
 	}
 
 	public static Properties loadProperties(String propFile) throws IOException
